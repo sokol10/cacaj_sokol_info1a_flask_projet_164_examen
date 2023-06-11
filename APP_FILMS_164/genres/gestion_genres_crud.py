@@ -34,7 +34,12 @@ def genres_afficher(order_by, id_genre_sel):
         try:
             with DBconnection() as mc_afficher:
                 if order_by == "ASC" and id_genre_sel == 0:
-                    strsql_genres_afficher = """SELECT id,nom,prenom,date_naissance FROM t_personnes ORDER BY id ASC"""
+                    strsql_genres_afficher = """SELECT t_personnes.id,t_personnes.nom,t_personnes.prenom,t_personnes.date_naissance,t_adresse.adresse,t_email.email,emploi_id 
+                                                FROM t_personnes 
+                                                INNER JOIN t_adresse ON t_personnes.adresse_id = t_adresse.id
+                                                INNER JOIN t_email ON t_personnes.email_id = t_email.id
+                                                INNER JOIN t_emplois ON t_personnes.emploi_id = t_emplois.id
+                                                ORDER BY id ASC"""
                     mc_afficher.execute(strsql_genres_afficher)
                 elif order_by == "ASC":
                     # C'EST LA QUE VOUS ALLEZ DEVOIR PLACER VOTRE PROPRE LOGIQUE MySql
@@ -43,11 +48,11 @@ def genres_afficher(order_by, id_genre_sel):
                     # donc, je précise les champs à afficher
                     # Constitution d'un dictionnaire pour associer l'id du genre sélectionné avec un nom de variable
                     valeur_id_genre_selected_dictionnaire = {"value_id_genre_selected": id_genre_sel}
-                    strsql_genres_afficher = """SELECT id,nom,date_naissance FROM t_personnes WHERE id = %(value_id_selected)s"""
+                    strsql_genres_afficher = """SELECT id,nom,prenom FROM t_personne WHERE id = %(value_id_genre_selected)s"""
 
                     mc_afficher.execute(strsql_genres_afficher, valeur_id_genre_selected_dictionnaire)
                 else:
-                    strsql_genres_afficher = """SELECT id,nom,prenom FROM t_personnes ORDER BY id DESC"""
+                    strsql_genres_afficher = """SELECT id,nom,prenom FROM t_personne ORDER BY id DESC"""
 
                     mc_afficher.execute(strsql_genres_afficher)
 
@@ -57,14 +62,14 @@ def genres_afficher(order_by, id_genre_sel):
 
                 # Différencier les messages si la table est vide.
                 if not data_genres and id_genre_sel == 0:
-                    flash("""La table "t_genre" est vide. !!""", "warning")
+                    flash("""La table "t_personne" est vide. !!""", "warning")
                 elif not data_genres and id_genre_sel > 0:
                     # Si l'utilisateur change l'id_genre dans l'URL et que le genre n'existe pas,
-                    flash(f"Le genre demandé n'existe pas !!", "warning")
+                    flash(f"La personne demandée n'existe pas !!", "warning")
                 else:
                     # Dans tous les autres cas, c'est que la table "t_genre" est vide.
                     # OM 2020.04.09 La ligne ci-dessous permet de donner un sentiment rassurant aux utilisateurs.
-                    flash(f"Données genres affichés !!", "success")
+                    flash(f"Les personnes sont affichées !!", "success")
 
         except Exception as Exception_genres_afficher:
             raise ExceptionGenresAfficher(f"fichier : {Path(__file__).name}  ;  "
@@ -91,7 +96,7 @@ def genres_afficher(order_by, id_genre_sel):
                 On ne doit pas accepter des valeurs vides, des valeurs avec des chiffres,
                 des valeurs avec des caractères qui ne sont pas des lettres.
                 Pour comprendre [A-Za-zÀ-ÖØ-öø-ÿ] il faut se reporter à la table ASCII https://www.ascii-code.com/
-                Accepte le trait d'union ou l'apostrophe, et l'espace entre deux mots, mais pas plus d'une occurence..
+                Accepte le trait d'union ou l'apostrophe, et l'espace entre deux mots, mais pas plus d'une occurence.
 """
 
 
@@ -103,33 +108,18 @@ def genres_ajouter_wtf():
             if form.validate_on_submit():
                 name_genre_wtf = form.nom_genre_wtf.data
                 name_genre = name_genre_wtf.lower()
-                valeurs_insertion_dictionnaire = {"value_intitule_genre": name_genre}
+                prenom_genre_wtf = form.prenom_genre_wtf.data
+                prenom_genre = prenom_genre_wtf.lower()
+                valeurs_insertion_dictionnaire = {"value_nom": name_genre,
+                                                  "value_prenom": prenom_genre}
                 print("valeurs_insertion_dictionnaire ", valeurs_insertion_dictionnaire)
 
-
-
-                strsql_insert_genre = """INSERT INTO t_personnes (id,nom,prenom,date_naissance) VALUES (NULL,%(value_intitule_genre)s) """
+                strsql_insert_genre = """INSERT INTO t_personnes (id,nom,prenom) VALUES (%(value_nom),%(value_prenom)s) """
                 with DBconnection() as mconn_bd:
                     mconn_bd.execute(strsql_insert_genre, valeurs_insertion_dictionnaire)
 
-                flash(f"Données insérées !!", "success")
-                print(f"Données insérées !!")
-
-                # Pour afficher et constater l'insertion de la valeur, on affiche en ordre inverse. (DESC)
-                return redirect(url_for('genres_afficher', order_by='DESC', id_genre_sel=0))
-
-            if form.validate_on_submit():
-                name_genre_wtf = form.nom_genre_wtf.data
-                name_genre = name_genre_wtf.lower()
-                valeurs_insertion_dictionnaire = {"value_intitule_genre": name_genre}
-                print("valeurs_insertion_dictionnaire ", valeurs_insertion_dictionnaire)
-
-                strsql_insert_genre = """INSERT INTO t_personnes (id_personnes,prenom) VALUES (NULL,%(value_intitule_genre)s) """
-                with DBconnection() as mconn_bd:
-                    mconn_bd.execute(strsql_insert_genre, valeurs_insertion_dictionnaire)
-
-                flash(f"Données insérées !!", "success")
-                print(f"Données insérées !!")
+                flash(f"Personne insérée !!", "success")
+                print(f"Personne insérée !!")
 
                 # Pour afficher et constater l'insertion de la valeur, on affiche en ordre inverse. (DESC)
                 return redirect(url_for('genres_afficher', order_by='DESC', id_genre_sel=0))
@@ -176,40 +166,40 @@ def genre_update_wtf():
             # Puis la convertir en lettres minuscules.
             name_genre_update = form_update.nom_genre_update_wtf.data
             name_genre_update = name_genre_update.lower()
-            date_genre_essai = form_update.date_genre_wtf_essai.data
+            prenom_genre_update = form_update.prenom_genre_update_wtf.data
 
             valeur_update_dictionnaire = {"value_id_genre": id_genre_update,
                                           "value_name_genre": name_genre_update,
-                                          "value_date_genre_essai": date_genre_essai
+                                          "value_prenom_genre": prenom_genre_update_wtf
                                           }
             print("valeur_update_dictionnaire ", valeur_update_dictionnaire)
 
-            str_sql_update_intitulegenre = """UPDATE t_personnes SET intitule_genre = %(value_name_genre)s, 
-            date_ins_genre = %(value_date_genre_essai)s WHERE id_personnes = %(value_id_genre)s """
+            str_sql_update_intitulegenre = """UPDATE t_personnes SET nom = %(value_name_genre)s, 
+            prenom = %(value_prenom_genre)s WHERE id = %(value_id_genre)s """
             with DBconnection() as mconn_bd:
                 mconn_bd.execute(str_sql_update_intitulegenre, valeur_update_dictionnaire)
 
-            flash(f"Donnée mise à jour !!", "success")
-            print(f"Donnée mise à jour !!")
+            flash(f"Personne mise à jour !!", "success")
+            print(f"Personne mise à jour !!")
 
             # afficher et constater que la donnée est mise à jour.
             # Affiche seulement la valeur modifiée, "ASC" et l'"id_genre_update"
             return redirect(url_for('genres_afficher', order_by="ASC", id_genre_sel=id_genre_update))
         elif request.method == "GET":
             # Opération sur la BD pour récupérer "id_genre" et "intitule_genre" de la "t_genre"
-            str_sql_id_genre = "SELECT id_genre, intitule_genre, date_ins_genre FROM t_genre " \
-                               "WHERE id_genre = %(value_id_genre)s"
+            str_sql_id_genre = "SELECT id, nom, prenom FROM t_personnes " \
+                               "WHERE id "
             valeur_select_dictionnaire = {"value_id_genre": id_genre_update}
             with DBconnection() as mybd_conn:
                 mybd_conn.execute(str_sql_id_genre, valeur_select_dictionnaire)
             # Une seule valeur est suffisante "fetchone()", vu qu'il n'y a qu'un seul champ "nom genre" pour l'UPDATE
             data_nom_genre = mybd_conn.fetchone()
-            print("data_nom_genre ", data_nom_genre, " type ", type(data_nom_genre), " genre ",
-                  data_nom_genre["intitule_genre"])
+            print("data_nom_genre ", data_nom_genre, " type ", type(data_nom_genre), " nom ", data_nom_genre["nom"], " prenom ", data_nom_genre["prenom"])
+
 
             # Afficher la valeur sélectionnée dans les champs du formulaire "genre_update_wtf.html"
-            form_update.nom_genre_update_wtf.data = data_nom_genre["intitule_genre"]
-            form_update.date_genre_wtf_essai.data = data_nom_genre["date_ins_genre"]
+            form_update.nom_genre_update_wtf.data = data_nom_genre["nom"]
+            form_update.prenom_genre_update_wtf.data = data_nom_genre["prenom"]
 
     except Exception as Exception_genre_update_wtf:
         raise ExceptionGenreUpdateWtf(f"fichier : {Path(__file__).name}  ;  "
@@ -284,10 +274,7 @@ def genre_delete_wtf():
             print(id_genre_delete, type(id_genre_delete))
 
             # Requête qui affiche tous les films_genres qui ont le genre que l'utilisateur veut effacer
-            str_sql_genres_films_delete = """SELECT id_genre_film, nom_film, id_genre, intitule_genre FROM t_genre_film 
-                                            INNER JOIN t_film ON t_genre_film.fk_film = t_film.id_film
-                                            INNER JOIN t_genre ON t_genre_film.fk_genre = t_genre.id_genre
-                                            WHERE fk_genre = %(value_id_genre)s"""
+            str_sql_genres_films_delete = """SELECT nom, prenom FROM t_personnes WHERE id"""
 
             with DBconnection() as mydb_conn:
                 mydb_conn.execute(str_sql_genres_films_delete, valeur_select_dictionnaire)
@@ -299,17 +286,18 @@ def genre_delete_wtf():
                 session['data_films_attribue_genre_delete'] = data_films_attribue_genre_delete
 
                 # Opération sur la BD pour récupérer "id_genre" et "intitule_genre" de la "t_genre"
-                str_sql_id_genre = "SELECT id_genre, intitule_genre FROM t_genre WHERE id_genre = %(value_id_genre)s"
+                str_sql_id_genre = "SELECT nom, prenom FROM t_personnes WHERE id"
 
                 mydb_conn.execute(str_sql_id_genre, valeur_select_dictionnaire)
                 # Une seule valeur est suffisante "fetchone()",
                 # vu qu'il n'y a qu'un seul champ "nom genre" pour l'action DELETE
                 data_nom_genre = mydb_conn.fetchone()
-                print("data_nom_genre ", data_nom_genre, " type ", type(data_nom_genre), " genre ",
-                      data_nom_genre["intitule_genre"])
+                print("data_nom_genre ", data_nom_genre, " type ", type(data_nom_genre), " nom ", data_nom_genre["nom"], " prenom ", data_nom_genre["prenom"])
+
 
             # Afficher la valeur sélectionnée dans le champ du formulaire "genre_delete_wtf.html"
-            form_delete.nom_genre_delete_wtf.data = data_nom_genre["intitule_genre"]
+            form_delete.nom_genre_delete_wtf.data = data_nom_genre["nom"]
+            form_delete.prenom_genre_delete_wtf.data = data_nom_genre["prenom"]
 
             # Le bouton pour l'action "DELETE" dans le form. "genre_delete_wtf.html" est caché.
             btn_submit_del = False

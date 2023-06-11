@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %} Effacer une Adresse (WTF) {% endblock %}
+{% block body %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <p>
+                Effacer une Adresse
+            </p>
+            <table class="table table-responsive-sm">
+                {% if data_adresse_del %}
+                <thead>
+                <tr>
+                    <th class="">
+                        Id
+                    </th>
+                    <th class="">
+                        Adresse
+                    </th>
+                    <th class="">
+                        Ville
+                    </th>
+                    <th class="">
+                        Code Postal
+                    </th>
+                    <th class="">
+                        Pays
+                    </th>
+                </tr>
+                </thead>
+                {% endif %}
+                {% for row in data_adresse_del %}
+                <tbody>
+                <tr>
+                    <th class="align-middle">
+                        {{ row.id }}
+                    </th>
+                    <th class="align-middle">
+                        {{ row.adresse }}
+                    </th>
+                    <th class="align-middle">
+                        {{ row.ville }}
+                    </th>
+                    <th class="align-middle">
+                        {{ row.code_postal }}
+                    </th>
+                    <th class="align-middle">
+                        {{ row.pays }}
+                    </th>
+                </tr>
+                </tbody>
+                {% else %}
+                <tbody>
+                <tr>
+
+                </tr>
+                </tbody>
+                {% endfor %}
+
+            </table>
+
+            <form action="" method="POST" novalidate>
+                <!-- Protection contre les attaques Cross-Site Request Forgery (CSRF) -->
+                {{ form.hidden_tag() }}
+                {{ form.submit_btn_conf_del_adresse(class="btn btn-info") }}
+
+                {% if btn_submit_del %}
+                    {{ form.submit_btn_del_adresse(class="btn btn-danger") }}
+                {% endif %}
+
+                {{ form.submit_btn_annuler(class="btn btn-primary") }}
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

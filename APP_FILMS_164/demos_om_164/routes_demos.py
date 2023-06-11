@@ -12,7 +12,8 @@ from APP_FILMS_164.erreurs.exceptions import *
 
 @app.route('/index')
 def index():
-    return "Hello, le MONDE du Module 164 !"
+    return "Voici mon projet pour le module 164 et voici mon plat préférer : https://marcas-logos.net/wp-content/uploads/2020/11/MySQL-logo.png et voici selon moi le prof de l'epsic le plus fou : https://tse1.mm.bing.net/th?id=OIP.46UgvxlL0NJKaBv2P3wrcQHaE8&pid=Api&P=0&h=180 et voici tous les emojis du monde " \
+           " "
 
 
 @app.route('/')
@@ -49,7 +50,7 @@ def personnes_taille_dict():
     print("val dans le dict ", msg_erreurs['ErreurDictionnaire'])
 
     # Défini un petit dictionnaire
-    taille_personnes_dict = {"OM": 194, "Gégé": 175, "Hugo": 163}
+    taille_personnes_dict = {"Cacaj": 194, "bruel": 175, "safeti": 163}
     #
     # OM 2020.04.09 Pour vos essais, il suffit d'enlever le # pour voir comment fonctionne pratiquement
     # le traitement de l'erreur.
@@ -59,7 +60,7 @@ def personnes_taille_dict():
     # nom_personne = "Gégé"
     # nom_personne = "Hugo"
 
-    nom_personne = "Pignon"
+    nom_personne = "Cacaj"
 
     try:
         # Tout se passe normalement

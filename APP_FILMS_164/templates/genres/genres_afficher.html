@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %} Afficher GENRES {% endblock %}
+{% block title %} Afficher PERSONNES {% endblock %}
 {% block body %}
 <div class="container">
 	<div class="row">
 		<div class="col-md-12">
 			<p>
-				Genres
+				Personnes
 			</p>
             <table class="table table-bordered table-sm">
             {% if data %}
@@ -15,16 +15,31 @@
                             Id
                         </th>
                         <th class="align-middle">
-                            Prénom
+                            Nom de la personne
                         </th>
                         <th class="align-middle">
-							nom
+							Prenom de la personne
+                        </th>
+						<th class="align-middle">
+							Date de naissance
+                        </th>
+						<th class="align-middle">
+							Adresse
+                        </th>
+						<th class="align-middle">
+							Email
+                        </th>
+						<th class="align-middle">
+							Emploi
                         </th>
                         <th class="align-middle">
-							date de naissance
+							Pour ajouter
                         </th>
                         <th class="align-middle">
-
+							Pour modifier
+                        </th>
+						<th class="align-middle">
+							Pour supprimer
                         </th>
                     </tr>
                 </thead>
@@ -37,13 +52,22 @@
 							{{ row.id }}
 						</td>
 						<td class="align-middle">
-							{{ row.prenom }}
-						</td>
-						<td class="align-middle">
 							{{ row.nom }}
 						</td>
 						<td class="align-middle">
+							{{ row.prenom }}
+						</td>
+						<td class="align-middle">
 							{{ row.date_naissance }}
+						</td>
+						<td class="align-middle">
+							{{ row.adresse}}
+						</td>
+						<td class="align-middle">
+							{{ row.email }}
+						</td>
+						<td class="align-middle">
+							{{ row.emploi_id }}
 						</td>
 						<td class="text-center" class="align-middle">
 							<a class="btn btn-primary" href="{{ url_for('genres_ajouter_wtf') }}" role="button">Ajouter</a>

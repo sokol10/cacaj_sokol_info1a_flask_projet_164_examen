@@ -12,7 +12,9 @@ from flask import url_for
 
 from APP_FILMS_164.database.database_tools import DBconnection
 from APP_FILMS_164.erreurs.exceptions import *
-
+from APP_FILMS_164.films_genres.gestion_films_genres_wtf_forms import FormWTFUpdateFilmsGenres
+from APP_FILMS_164.films_genres.gestion_films_genres_wtf_forms import FormWTFAjouterFilmsGenres
+from APP_FILMS_164.films_genres.gestion_films_genres_wtf_forms import FormWTFDeleteFilmsGenres
 """
     Nom : films_genres_afficher
     Auteur : OM 2021.05.01
@@ -26,302 +28,135 @@ from APP_FILMS_164.erreurs.exceptions import *
 """
 
 
-@app.route("/films_genres_afficher/<int:id_film_sel>", methods=['GET', 'POST'])
-def films_genres_afficher(id_film_sel):
-    print(" films_genres_afficher id_film_sel ", id_film_sel)
+@app.route("/films_genres_afficher/<int:id_adresse_sel>", methods=['GET', 'POST'])
+def films_genres_afficher(id_adresse_sel):
+    print("films_genres_afficher id_adresse_sel ", id_adresse_sel)
     if request.method == "GET":
         try:
             with DBconnection() as mc_afficher:
-                strsql_genres_films_afficher_data = """SELECT id_film, nom_film, duree_film, description_film, cover_link_film, date_sortie_film,
-                                                            GROUP_CONCAT(intitule_genre) as GenresFilms FROM t_genre_film
-                                                            RIGHT JOIN t_film ON t_film.id_film = t_genre_film.fk_film
-                                                            LEFT JOIN t_genre ON t_genre.id_genre = t_genre_film.fk_genre
-                                                            GROUP BY id_film"""
-                if id_film_sel == 0:
-                    # le paramètre 0 permet d'afficher tous les films
-                    # Sinon le paramètre représente la valeur de l'id du film
-                    mc_afficher.execute(strsql_genres_films_afficher_data)
+                strsql_genres_films_afficher_data = """SELECT id, adresse, ville, code_postal, pays FROM t_adresse"""
+                if id_adresse_sel == 0:
+                    mc_afficher.execute(strsql_genres_films_afficher_data + " ORDER BY id")
                 else:
-                    # Constitution d'un dictionnaire pour associer l'id du film sélectionné avec un nom de variable
-                    valeur_id_film_selected_dictionnaire = {"value_id_film_selected": id_film_sel}
-                    # En MySql l'instruction HAVING fonctionne comme un WHERE... mais doit être associée à un GROUP BY
-                    # L'opérateur += permet de concaténer une nouvelle valeur à la valeur de gauche préalablement définie.
-                    strsql_genres_films_afficher_data += """ HAVING id_film= %(value_id_film_selected)s"""
+                    valeur_id_adresse_selected_dictionnaire = {"value_id_adresse_selected": id_adresse_sel}
+                    strsql_genres_films_afficher_data += " WHERE id = %(value_id_adresse_selected)s ORDER BY id"
+                    mc_afficher.execute(strsql_genres_films_afficher_data, valeur_id_adresse_selected_dictionnaire)
 
-                    mc_afficher.execute(strsql_genres_films_afficher_data, valeur_id_film_selected_dictionnaire)
-
-                # Récupère les données de la requête.
                 data_genres_films_afficher = mc_afficher.fetchall()
                 print("data_genres ", data_genres_films_afficher, " Type : ", type(data_genres_films_afficher))
 
-                # Différencier les messages.
-                if not data_genres_films_afficher and id_film_sel == 0:
-                    flash("""La table "t_film" est vide. !""", "warning")
-                elif not data_genres_films_afficher and id_film_sel > 0:
-                    # Si l'utilisateur change l'id_film dans l'URL et qu'il ne correspond à aucun film
-                    flash(f"Le film {id_film_sel} demandé n'existe pas !!", "warning")
+                if not data_genres_films_afficher and id_adresse_sel == 0:
+                    flash("""La table "t_adresse" est vide. !""", "warning")
+                elif not data_genres_films_afficher and id_adresse_sel > 0:
+                    flash(f"L'adresse du film {id_adresse_sel} demandé n'existe pas !!", "warning")
                 else:
-                    flash(f"Données films et genres affichés !!", "success")
+                    flash(f"Données des films et des adresses affichées !!", "success")
 
         except Exception as Exception_films_genres_afficher:
             raise ExceptionFilmsGenresAfficher(f"fichier : {Path(__file__).name}  ;  {films_genres_afficher.__name__} ;"
                                                f"{Exception_films_genres_afficher}")
 
-    print("films_genres_afficher  ", data_genres_films_afficher)
-    # Envoie la page "HTML" au serveur.
-    return render_template("films_genres/films_genres_afficher.html", data=data_genres_films_afficher)
+    return render_template("films_genres/films_genres_afficher.html", data_genres=data_genres_films_afficher)
 
 
-"""
-    nom: edit_genre_film_selected
-    On obtient un objet "objet_dumpbd"
-
-    Récupère la liste de tous les genres du film sélectionné par le bouton "MODIFIER" de "films_genres_afficher.html"
-    
-    Dans une liste déroulante particulière (tags-selector-tagselect), on voit :
-    1) Tous les genres contenus dans la "t_genre".
-    2) Les genres attribués au film selectionné.
-    3) Les genres non-attribués au film sélectionné.
-
-    On signale les erreurs importantes
-
-"""
-
-
-@app.route("/edit_genre_film_selected", methods=['GET', 'POST'])
-def edit_genre_film_selected():
-    if request.method == "GET":
-        try:
-            with DBconnection() as mc_afficher:
-                strsql_genres_afficher = """SELECT id,nom,prenom,date_naissance FROM t_personnes ORDER BY id ASC
-"""
-                mc_afficher.execute(strsql_genres_afficher)
-            data_genres_all = mc_afficher.fetchall()
-            print("dans edit_genre_film_selected ---> data_genres_all", data_genres_all)
-
-            # Récupère la valeur de "id_film" du formulaire html "films_genres_afficher.html"
-            # l'utilisateur clique sur le bouton "Modifier" et on récupère la valeur de "id_film"
-            # grâce à la variable "id_film_genres_edit_html" dans le fichier "films_genres_afficher.html"
-            # href="{{ url_for('edit_genre_film_selected', id_film_genres_edit_html=row.id_film) }}"
-            id_film_genres_edit = request.values['id_film_genres_edit_html']
-
-            # Mémorise l'id du film dans une variable de session
-            # (ici la sécurité de l'application n'est pas engagée)
-            # il faut éviter de stocker des données sensibles dans des variables de sessions.
-            session['session_id_film_genres_edit'] = id_film_genres_edit
-
-            # Constitution d'un dictionnaire pour associer l'id du film sélectionné avec un nom de variable
-            valeur_id_film_selected_dictionnaire = {"value_id_film_selected": id_film_genres_edit}
-
-            # Récupère les données grâce à 3 requêtes MySql définie dans la fonction genres_films_afficher_data
-            # 1) Sélection du film choisi
-            # 2) Sélection des genres "déjà" attribués pour le film.
-            # 3) Sélection des genres "pas encore" attribués pour le film choisi.
-            # ATTENTION à l'ordre d'assignation des variables retournées par la fonction "genres_films_afficher_data"
-            data_genre_film_selected, data_genres_films_non_attribues, data_genres_films_attribues = \
-                genres_films_afficher_data(valeur_id_film_selected_dictionnaire)
-
-            print(data_genre_film_selected)
-            lst_data_film_selected = [item['id_film'] for item in data_genre_film_selected]
-            print("lst_data_film_selected  ", lst_data_film_selected,
-                  type(lst_data_film_selected))
-
-            # Dans le composant "tags-selector-tagselect" on doit connaître
-            # les genres qui ne sont pas encore sélectionnés.
-            lst_data_genres_films_non_attribues = [item['id_genre'] for item in data_genres_films_non_attribues]
-            session['session_lst_data_genres_films_non_attribues'] = lst_data_genres_films_non_attribues
-            print("lst_data_genres_films_non_attribues  ", lst_data_genres_films_non_attribues,
-                  type(lst_data_genres_films_non_attribues))
-
-            # Dans le composant "tags-selector-tagselect" on doit connaître
-            # les genres qui sont déjà sélectionnés.
-            lst_data_genres_films_old_attribues = [item['id_genre'] for item in data_genres_films_attribues]
-            session['session_lst_data_genres_films_old_attribues'] = lst_data_genres_films_old_attribues
-            print("lst_data_genres_films_old_attribues  ", lst_data_genres_films_old_attribues,
-                  type(lst_data_genres_films_old_attribues))
-
-            print(" data data_genre_film_selected", data_genre_film_selected, "type ", type(data_genre_film_selected))
-            print(" data data_genres_films_non_attribues ", data_genres_films_non_attribues, "type ",
-                  type(data_genres_films_non_attribues))
-            print(" data_genres_films_attribues ", data_genres_films_attribues, "type ",
-                  type(data_genres_films_attribues))
-
-            # Extrait les valeurs contenues dans la table "t_genres", colonne "intitule_genre"
-            # Le composant javascript "tagify" pour afficher les tags n'a pas besoin de l'id_genre
-            lst_data_genres_films_non_attribues = [item['intitule_genre'] for item in data_genres_films_non_attribues]
-            print("lst_all_genres gf_edit_genre_film_selected ", lst_data_genres_films_non_attribues,
-                  type(lst_data_genres_films_non_attribues))
-
-        except Exception as Exception_edit_genre_film_selected:
-            raise ExceptionEditGenreFilmSelected(f"fichier : {Path(__file__).name}  ;  "
-                                                 f"{edit_genre_film_selected.__name__} ; "
-                                                 f"{Exception_edit_genre_film_selected}")
-
-    return render_template("films_genres/films_genres_modifier_tags_dropbox.html",
-                           data_genres=data_genres_all,
-                           data_film_selected=data_genre_film_selected,
-                           data_genres_attribues=data_genres_films_attribues,
-                           data_genres_non_attribues=data_genres_films_non_attribues)
-
-
-"""
-    nom: update_genre_film_selected
-
-    Récupère la liste de tous les genres du film sélectionné par le bouton "MODIFIER" de "films_genres_afficher.html"
-    
-    Dans une liste déroulante particulière (tags-selector-tagselect), on voit :
-    1) Tous les genres contenus dans la "t_genre".
-    2) Les genres attribués au film selectionné.
-    3) Les genres non-attribués au film sélectionné.
-
-    On signale les erreurs importantes
-"""
-
-
-@app.route("/update_genre_film_selected", methods=['GET', 'POST'])
-def update_genre_film_selected():
+@app.route("/films_genres_ajouter", methods=['GET', 'POST'])
+def films_genres_ajouter():
+    form = FormWTFAjouterFilmsGenres()
     if request.method == "POST":
         try:
-            # Récupère l'id du film sélectionné
-            id_film_selected = session['session_id_film_genres_edit']
-            print("session['session_id_film_genres_edit'] ", session['session_id_film_genres_edit'])
+            if form.validate_on_submit():
+                adresse_wtf = form.adresse_wtf.data
+                adresse = adresse_wtf.lower()
+                ville_wtf = form.ville_wtf.data
+                ville = ville_wtf.lower()
+                code_postal_wtf = form.code_postal_wtf.data
+                code_postal = code_postal_wtf.lower()
+                pays_wtf = form.pays_wtf.data
+                pays = pays_wtf.lower()
+                valeurs_insertion_dictionnaire = {"value_adresse": adresse,
+                                                  "value_ville": ville,
+                                                  "value_cp": code_postal,
+                                                  "value_pays": pays}
+                print("valeurs_insertion_dictionnaire ", valeurs_insertion_dictionnaire)
 
-            # Récupère la liste des genres qui ne sont pas associés au film sélectionné.
-            old_lst_data_genres_films_non_attribues = session['session_lst_data_genres_films_non_attribues']
-            print("old_lst_data_genres_films_non_attribues ", old_lst_data_genres_films_non_attribues)
+                strsql_insert_adresse = """INSERT INTO t_adresse (adresse, ville, code_postal, pays) VALUES (%(value_adresse)s, %(value_ville)s, %(value_code_postal)s, %(value_pays)s)"""
+                with DBconnection() as mconn_bd:
+                    mconn_bd.execute(strsql_insert_adresse, valeurs_insertion_dictionnaire)
 
-            # Récupère la liste des genres qui sont associés au film sélectionné.
-            old_lst_data_genres_films_attribues = session['session_lst_data_genres_films_old_attribues']
-            print("old_lst_data_genres_films_old_attribues ", old_lst_data_genres_films_attribues)
+                flash("L'adresse a été ajoutée avec succès !", "success")
+                return redirect(url_for("films_genres_afficher", id_adresse_sel=0))
 
-            # Effacer toutes les variables de session.
-            session.clear()
+        except Exception as Exception_films_genres_ajouter:
+            raise ExceptionFilmsGenresAjouter(f"fichier : {Path(__file__).name}  ;  {films_genres_ajouter.__name__} ;"
+                                              f"{Exception_films_genres_ajouter}")
 
-            # Récupère ce que l'utilisateur veut modifier comme genres dans le composant "tags-selector-tagselect"
-            # dans le fichier "genres_films_modifier_tags_dropbox.html"
-            new_lst_str_genres_films = request.form.getlist('name_select_tags')
-            print("new_lst_str_genres_films ", new_lst_str_genres_films)
-
-            # OM 2021.05.02 Exemple : Dans "name_select_tags" il y a ['4','65','2']
-            # On transforme en une liste de valeurs numériques. [4,65,2]
-            new_lst_int_genre_film_old = list(map(int, new_lst_str_genres_films))
-            print("new_lst_genre_film ", new_lst_int_genre_film_old, "type new_lst_genre_film ",
-                  type(new_lst_int_genre_film_old))
-
-            # Pour apprécier la facilité de la vie en Python... "les ensembles en Python"
-            # https://fr.wikibooks.org/wiki/Programmation_Python/Ensembles
-            # OM 2021.05.02 Une liste de "id_genre" qui doivent être effacés de la table intermédiaire "t_genre_film".
-            lst_diff_genres_delete_b = list(set(old_lst_data_genres_films_attribues) -
-                                            set(new_lst_int_genre_film_old))
-            print("lst_diff_genres_delete_b ", lst_diff_genres_delete_b)
-
-            # Une liste de "id_genre" qui doivent être ajoutés à la "t_genre_film"
-            lst_diff_genres_insert_a = list(
-                set(new_lst_int_genre_film_old) - set(old_lst_data_genres_films_attribues))
-            print("lst_diff_genres_insert_a ", lst_diff_genres_insert_a)
-
-            # SQL pour insérer une nouvelle association entre
-            # "fk_film"/"id_film" et "fk_genre"/"id_genre" dans la "t_genre_film"
-            strsql_insert_genre_film = """INSERT INTO t_genre_film (id_genre_film, fk_genre, fk_film)
-                                                    VALUES (NULL, %(value_fk_genre)s, %(value_fk_film)s)"""
-
-            # SQL pour effacer une (des) association(s) existantes entre "id_film" et "id_genre" dans la "t_genre_film"
-            strsql_delete_genre_film = """DELETE FROM t_genre_film WHERE fk_genre = %(value_fk_genre)s AND fk_film = %(value_fk_film)s"""
-
-            with DBconnection() as mconn_bd:
-                # Pour le film sélectionné, parcourir la liste des genres à INSÉRER dans la "t_genre_film".
-                # Si la liste est vide, la boucle n'est pas parcourue.
-                for id_genre_ins in lst_diff_genres_insert_a:
-                    # Constitution d'un dictionnaire pour associer l'id du film sélectionné avec un nom de variable
-                    # et "id_genre_ins" (l'id du genre dans la liste) associé à une variable.
-                    valeurs_film_sel_genre_sel_dictionnaire = {"value_fk_film": id_film_selected,
-                                                               "value_fk_genre": id_genre_ins}
-
-                    mconn_bd.execute(strsql_insert_genre_film, valeurs_film_sel_genre_sel_dictionnaire)
-
-                # Pour le film sélectionné, parcourir la liste des genres à EFFACER dans la "t_genre_film".
-                # Si la liste est vide, la boucle n'est pas parcourue.
-                for id_genre_del in lst_diff_genres_delete_b:
-                    # Constitution d'un dictionnaire pour associer l'id du film sélectionné avec un nom de variable
-                    # et "id_genre_del" (l'id du genre dans la liste) associé à une variable.
-                    valeurs_film_sel_genre_sel_dictionnaire = {"value_fk_film": id_film_selected,
-                                                               "value_fk_genre": id_genre_del}
-
-                    # Du fait de l'utilisation des "context managers" on accède au curseur grâce au "with".
-                    # la subtilité consiste à avoir une méthode "execute" dans la classe "DBconnection"
-                    # ainsi quand elle aura terminé l'insertion des données le destructeur de la classe "DBconnection"
-                    # sera interprété, ainsi on fera automatiquement un commit
-                    mconn_bd.execute(strsql_delete_genre_film, valeurs_film_sel_genre_sel_dictionnaire)
-
-        except Exception as Exception_update_genre_film_selected:
-            raise ExceptionUpdateGenreFilmSelected(f"fichier : {Path(__file__).name}  ;  "
-                                                   f"{update_genre_film_selected.__name__} ; "
-                                                   f"{Exception_update_genre_film_selected}")
-
-    # Après cette mise à jour de la table intermédiaire "t_genre_film",
-    # on affiche les films et le(urs) genre(s) associé(s).
-    return redirect(url_for('films_genres_afficher', id_film_sel=id_film_selected))
+    return render_template("films_genres/films_genres_ajouter_wtf.html", form=form)
 
 
-"""
-    nom: genres_films_afficher_data
+@app.route("/films_genres_update/<int:id_adresse_sel>", methods=['GET', 'POST'])
+def films_genres_update_wtf(id_adresse_sel):
+    form = FormWTFUpdateFilmsGenres()
+    if request.method == "POST":
+        try:
+            if form.validate_on_submit():
+                adresse_wtf = form.adresse_wtf.data
+                adresse = adresse_wtf.lower()
+                ville_wtf = form.ville_wtf.data
+                ville = ville_wtf.lower()
+                code_postal_wtf = form.code_postal_wtf.data
+                code_postal = code_postal_wtf.lower()
+                pays_wtf = form.pays_wtf.data
+                pays = pays_wtf.lower()
+                valeurs_update_dictionnaire = {"value_adresse": adresse,
+                                                  "value_ville": ville,
+                                                  "value_cp": code_postal,
+                                                  "value_pays": pays}
+                print("valeurs_update_dictionnaire ", valeurs_update_dictionnaire)
 
-    Récupère la liste de tous les genres du film sélectionné par le bouton "MODIFIER" de "films_genres_afficher.html"
-    Nécessaire pour afficher tous les "TAGS" des genres, ainsi l'utilisateur voit les genres à disposition
+                with DBconnection() as mc_modifier:
+                    # Exécuter la requête SQL pour mettre à jour l'enregistrement
+                    strsql_modifier = "UPDATE t_adresse SET adresse = %s, ville = %s, code_postal = %s, pays = %s WHERE id = %s"
+                    valeurs = (adresse, ville, code_postal, pays, id_adresse_sel)
+                    mc_modifier.execute(strsql_modifier, valeurs)
 
-    On signale les erreurs importantes
-"""
+                flash("L'adresse a été modifiée avec succès !", "success")
+                return redirect(url_for("films_genres_afficher", id_adresse_sel=0))
+
+        except Exception as Exception_films_genres_update_wtf:
+            raise ExceptionFilmsGenresUpdateWTF(f"fichier : {Path(__file__).name}  ;  {films_genres_update_wtf.__name__} ;"
+                                                f"{Exception_films_genres_update_wtf}")
+
+    return render_template("films_genres/films_genres_update_wtf.html", form=form, id_adresse_sel=id_adresse_sel)
 
 
-def genres_films_afficher_data(valeur_id_film_selected_dict):
-    print("valeur_id_film_selected_dict...", valeur_id_film_selected_dict)
-    try:
+@app.route("/films_genres_delete/<int:id_adresse_sel>", methods=['GET', 'POST'])
+def films_genres_delete(id_adresse_sel):
+    form = FormWTFDeleteFilmsGenres()
 
-        strsql_film_selected = """SELECT id_film, nom_film, duree_film, description_film, cover_link_film, date_sortie_film, GROUP_CONCAT(id_genre) as GenresFilms FROM t_genre_film
-                                        INNER JOIN t_film ON t_film.id_film = t_genre_film.fk_film
-                                        INNER JOIN t_genre ON t_genre.id_genre = t_genre_film.fk_genre
-                                        WHERE id_film = %(value_id_film_selected)s"""
+    if request.method == "POST":
+        try:
+            if form.validate_on_submit():
 
-        strsql_genres_films_non_attribues = """SELECT id_genre, intitule_genre FROM t_genre WHERE id_genre not in(SELECT id_genre as idGenresFilms FROM t_genre_film
-                                                    INNER JOIN t_film ON t_film.id_film = t_genre_film.fk_film
-                                                    INNER JOIN t_genre ON t_genre.id_genre = t_genre_film.fk_genre
-                                                    WHERE id_film = %(value_id_film_selected)s)"""
+                # Récupère le nom du film pour le message de confirmation
+                with DBconnection() as mconn_bd:
+                    strsql_select_adresse = f"SELECT id, adresse, ville, code_postal, pays FROM t_adresse WHERE id = {id_adresse_sel}"
+                    mconn_bd.execute(strsql_select_adresse)
+                    data_adresse = mconn_bd.fetchone()
+                    adresse = data_adresse["adresse"]
+                    ville = data_adresse["ville"]
+                    code_postal = data_adresse["code_postal"]
+                    pays = data_adresse["pays"]
 
-        strsql_genres_films_attribues = """SELECT id_film, id_genre, intitule_genre FROM t_genre_film
-                                            INNER JOIN t_film ON t_film.id_film = t_genre_film.fk_film
-                                            INNER JOIN t_genre ON t_genre.id_genre = t_genre_film.fk_genre
-                                            WHERE id_film = %(value_id_film_selected)s"""
+                with DBconnection() as mc_delete:
+                    # Supprimer l'enregistrement du film
+                    strsql_delete = f"DELETE FROM t_adresse WHERE id = {id_adresse_sel}"
+                    mc_delete.execute(strsql_delete)
 
-        # Du fait de l'utilisation des "context managers" on accède au curseur grâce au "with".
-        with DBconnection() as mc_afficher:
-            # Envoi de la commande MySql
-            mc_afficher.execute(strsql_genres_films_non_attribues, valeur_id_film_selected_dict)
-            # Récupère les données de la requête.
-            data_genres_films_non_attribues = mc_afficher.fetchall()
-            # Affichage dans la console
-            print("genres_films_afficher_data ----> data_genres_films_non_attribues ", data_genres_films_non_attribues,
-                  " Type : ",
-                  type(data_genres_films_non_attribues))
+                flash(f"L'adresse {adresse}, {ville}, {code_postal}, {pays} a été supprimée avec succès !", "success")
+                return redirect(url_for("films_genres_afficher", id_adresse_sel=0))
 
-            # Envoi de la commande MySql
-            mc_afficher.execute(strsql_film_selected, valeur_id_film_selected_dict)
-            # Récupère les données de la requête.
-            data_film_selected = mc_afficher.fetchall()
-            # Affichage dans la console
-            print("data_film_selected  ", data_film_selected, " Type : ", type(data_film_selected))
+        except Exception as Exception_films_genres_delete:
+            raise ExceptionFilmsGenresDelete(f"fichier : {Path(__file__).name}  ;  {films_genres_delete.__name__} ;"
+                                             f"{Exception_films_genres_delete}")
 
-            # Envoi de la commande MySql
-            mc_afficher.execute(strsql_genres_films_attribues, valeur_id_film_selected_dict)
-            # Récupère les données de la requête.
-            data_genres_films_attribues = mc_afficher.fetchall()
-            # Affichage dans la console
-            print("data_genres_films_attribues ", data_genres_films_attribues, " Type : ",
-                  type(data_genres_films_attribues))
-
-            # Retourne les données des "SELECT"
-            return data_film_selected, data_genres_films_non_attribues, data_genres_films_attribues
-
-    except Exception as Exception_genres_films_afficher_data:
-        raise ExceptionGenresFilmsAfficherData(f"fichier : {Path(__file__).name}  ;  "
-                                               f"{genres_films_afficher_data.__name__} ; "
-                                               f"{Exception_genres_films_afficher_data}")
+    return render_template("films_genres/films_genres_delete_wtf.html", form=form, id_adresse_sel=id_adresse_sel)
